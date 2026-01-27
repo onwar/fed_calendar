@@ -38,6 +38,7 @@ def fetch_fed_dates():
 
 def generate_ics(dates):
     cal = Calendar()
+    cal.extra.append(requests.structures.CaseInsensitiveDict({"X-WR-CALNAME": "美联储议息会议"}))
     # 美东 14:00 对应 UTC 19:00 (夏令时) 或 20:00 (冬令时)
     # ICS 订阅会自动根据用户本地时区转换，这里存入 UTC 时间
     for d_str in dates:
