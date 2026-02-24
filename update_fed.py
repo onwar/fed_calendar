@@ -1,9 +1,7 @@
 import requests
 import json
 from ics import Calendar, Event
-from ics.grammar.parse import ContentLine
-from datetime import datetime
-import pytz
+from datetime import datetime, timezone, timedelta
 import sys
 
 def fetch_fed_dates():
@@ -38,26 +36,34 @@ def fetch_fed_dates():
 
 def generate_ics(dates):
     cal = Calendar()
-    
-    # 设置日历默认名称
-    cal.extra.append(ContentLine(name="X-WR-CALNAME", value="美联储议息会议"))
-    cal.extra.append(ContentLine(name="X-WR-CALDESC", value="自动同步 CME FedWatch 利率决议日程"))
-    
+    cal.creator = "fed_calendar_bot"
+
     for d_str in dates:
         event = Event()
         event.name = "美联储利率决议 (FOMC Decision)"
         
-        # 维持精确时间戳逻辑：UTC 19:00
-        # 生成的格式符合：DTSTART:20260128T190000Z
-        dt = datetime.strptime(d_str, "%Y-%m-%d")
-        event.begin = dt.replace(hour=19, minute=0, second=0, tzinfo=pytz.UTC)
-        event.duration = {"minutes": 30}
-        
-        event.description = f"数据源: CME FedWatch Tool\n自动同步时间: {datetime.now().strftime('%Y-%m-%d')}"
+        # UTC 19:00
+        dt = datetime.strptime(d_str, "%Y-%m-%d").replace(
+            hour=19, minute=0, second=0, tzinfo=timezone.utc
+        )
+        event.begin = dt
+        event.duration = timedelta(minutes=30)
+        event.description = (
+            f"数据源: CME FedWatch Tool\n"
+            f"自动同步时间: {datetime.now().strftime('%Y-%m-%d')}"
+        )
         cal.events.add(event)
-    
+
+    # 手动在文件头注入日历名称（ics 0.7 不直接支持 X-WR-CALNAME 属性设置）
+    ics_content = cal.serialize()
+    ics_content = ics_content.replace(
+        "BEGIN:VCALENDAR\r\n",
+        "BEGIN:VCALENDAR\r\nX-WR-CALNAME:美联储议息会议\r\nX-WR-CALDESC:自动同步 CME FedWatch 利率决议日程\r\n",
+        1
+    )
+
     with open("fed_meetings.ics", "w", encoding="utf-8") as f:
-        f.writelines(cal.serialize_iter())
+        f.write(ics_content)
 
 if __name__ == "__main__":
     dates = fetch_fed_dates()
